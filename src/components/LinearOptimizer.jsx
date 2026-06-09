@@ -1,6 +1,6 @@
 // src/components/LinearOptimizer.jsx
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { solveLinearOptimization } from '../utils/linearSolver'
 import LinearChart from './LinearChart'
 import ExplanationCard from './ExplanationCard'
@@ -29,6 +29,35 @@ function LinearOptimizer() {
   const [formData, setFormData] = useState(initialValues)
   const [result, setResult] = useState(() => solveLinearOptimization(initialValues))
 
+  const [isLinearAnimating, setIsLinearAnimating] = useState(false)
+  const [linearAnimationIndex, setLinearAnimationIndex] = useState(
+    result.feasiblePoints.length,
+  )
+
+  useEffect(() => {
+    if (!isLinearAnimating) return
+
+    if (result.feasiblePoints.length === 0) {
+      setIsLinearAnimating(false)
+      return
+    }
+
+    const interval = setInterval(() => {
+      setLinearAnimationIndex((currentIndex) => {
+        const nextIndex = currentIndex + 1
+
+        if (nextIndex >= result.feasiblePoints.length) {
+          setIsLinearAnimating(false)
+          return result.feasiblePoints.length
+        }
+
+        return nextIndex
+      })
+    }, 450)
+
+    return () => clearInterval(interval)
+  }, [isLinearAnimating, result.feasiblePoints.length])
+
   function handleChange(event) {
     const { name, value } = event.target
 
@@ -42,8 +71,33 @@ function LinearOptimizer() {
     event.preventDefault()
 
     const solution = solveLinearOptimization(formData)
+
     setResult(solution)
+    setIsLinearAnimating(false)
+    setLinearAnimationIndex(solution.feasiblePoints.length)
   }
+
+  function handleStartLinearAnimation() {
+    if (result.feasiblePoints.length === 0) return
+
+    setLinearAnimationIndex(0)
+    setIsLinearAnimating(true)
+  }
+
+  function handleResetLinearAnimation() {
+    setIsLinearAnimating(false)
+    setLinearAnimationIndex(0)
+  }
+
+  const animatedFeasiblePoints = result.feasiblePoints.slice(
+    0,
+    linearAnimationIndex,
+  )
+
+  const showLinearBestPoint =
+    !result.error &&
+    result.bestPoint &&
+    linearAnimationIndex >= result.feasiblePoints.length
 
   return (
     <section className="optimizer-page">
@@ -206,48 +260,50 @@ function LinearOptimizer() {
       </div>
 
       <section className="explanation-section">
-  <div className="section-header compact-header">
-    <span className="section-tag">Explicação matemática</span>
-    <h2>Como funciona a otimização linear?</h2>
-    <p>
-      Este módulo mostra como uma função objetivo e restrições lineares podem ser
-      usadas para encontrar a melhor decisão de produção.
-    </p>
-  </div>
+        <div className="section-header compact-header">
+          <span className="section-tag">Explicação matemática</span>
+          <h2>Como funciona a otimização linear?</h2>
+          <p>
+            Este módulo mostra como uma função objetivo e restrições lineares
+            podem ser usadas para encontrar a melhor decisão de produção.
+          </p>
+        </div>
 
-  <div className="explanation-grid">
-    <ExplanationCard title="Função objetivo" tag="Lucro">
-      <p>
-        A função objetivo representa o lucro total da fábrica. O sistema tenta
-        encontrar os valores de x e y que tornam esse lucro o maior possível.
-      </p>
-      <div className="mini-equation">Z = c1x + c2y</div>
-    </ExplanationCard>
+        <div className="explanation-grid">
+          <ExplanationCard title="Função objetivo" tag="Lucro">
+            <p>
+              A função objetivo representa o lucro total da fábrica. O sistema
+              tenta encontrar os valores de x e y que tornam esse lucro o maior
+              possível.
+            </p>
+            <div className="mini-equation">Z = c1x + c2y</div>
+          </ExplanationCard>
 
-    <ExplanationCard title="Restrições" tag="Limites">
-      <p>
-        As restrições representam os recursos disponíveis, como matéria-prima,
-        tempo de máquina ou capacidade de produção.
-      </p>
-      <div className="mini-equation">ax + by ≤ d</div>
-    </ExplanationCard>
+          <ExplanationCard title="Restrições" tag="Limites">
+            <p>
+              As restrições representam os recursos disponíveis, como
+              matéria-prima, tempo de máquina ou capacidade de produção.
+            </p>
+            <div className="mini-equation">ax + by ≤ d</div>
+          </ExplanationCard>
 
-    <ExplanationCard title="Região viável" tag="Possibilidades">
-      <p>
-        A região viável é o conjunto de pontos que respeitam todas as
-        restrições. Cada ponto representa uma possível combinação de produção.
-      </p>
-    </ExplanationCard>
+          <ExplanationCard title="Região viável" tag="Possibilidades">
+            <p>
+              A região viável é o conjunto de pontos que respeitam todas as
+              restrições. Cada ponto representa uma possível combinação de
+              produção.
+            </p>
+          </ExplanationCard>
 
-    <ExplanationCard title="Solução ótima" tag="Resultado">
-      <p>
-        Em problemas lineares com duas variáveis, a melhor solução ocorre em um
-        dos vértices da região viável. Por isso, o sistema testa os pontos
-        candidatos e escolhe o maior valor de Z.
-      </p>
-    </ExplanationCard>
-  </div>
-</section>
+          <ExplanationCard title="Solução ótima" tag="Resultado">
+            <p>
+              Em problemas lineares com duas variáveis, a melhor solução ocorre
+              em um dos vértices da região viável. Por isso, o sistema testa os
+              pontos candidatos e escolhe o maior valor de Z.
+            </p>
+          </ExplanationCard>
+        </div>
+      </section>
 
       {result.error && (
         <div className="error-box">
@@ -274,13 +330,35 @@ function LinearOptimizer() {
         </div>
       )}
 
-        {result.feasiblePoints.length > 0 && (
+      {result.feasiblePoints.length > 0 && (
+        <div className="animation-controls">
+          <button
+            type="button"
+            className="secondary-action"
+            onClick={handleStartLinearAnimation}
+            disabled={isLinearAnimating}
+          >
+            {isLinearAnimating ? 'Animando...' : 'Animar solução linear'}
+          </button>
+
+          <button
+            type="button"
+            className="secondary-action outline"
+            onClick={handleResetLinearAnimation}
+          >
+            Reiniciar animação
+          </button>
+        </div>
+      )}
+
+      {result.feasiblePoints.length > 0 && (
         <LinearChart
-        params={formData}
-         feasiblePoints={result.feasiblePoints}
-         bestPoint={result.bestPoint}
-         />
-        )}
+          params={formData}
+          feasiblePoints={animatedFeasiblePoints}
+          bestPoint={showLinearBestPoint ? result.bestPoint : null}
+        />
+      )}
+
       <div className="optimizer-card">
         <h3>Pontos viáveis analisados</h3>
 

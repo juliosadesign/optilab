@@ -1,6 +1,6 @@
 // src/components/NonlinearOptimizer.jsx
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { solveNonlinearOptimization } from '../utils/nonlinearSolver'
 import IterationTable from './IterationTable'
 import NonlinearChart from './NonlinearChart'
@@ -28,6 +28,33 @@ function NonlinearOptimizer() {
     solveNonlinearOptimization(initialValues),
   )
 
+  const [isAnimating, setIsAnimating] = useState(false)
+  const [animationIndex, setAnimationIndex] = useState(result.iterations.length)
+
+  useEffect(() => {
+    if (!isAnimating) return
+
+    if (result.iterations.length === 0) {
+      setIsAnimating(false)
+      return
+    }
+
+    const interval = setInterval(() => {
+      setAnimationIndex((currentIndex) => {
+        const nextIndex = currentIndex + 1
+
+        if (nextIndex >= result.iterations.length) {
+          setIsAnimating(false)
+          return result.iterations.length
+        }
+
+        return nextIndex
+      })
+    }, 350)
+
+    return () => clearInterval(interval)
+  }, [isAnimating, result.iterations.length])
+
   function handleChange(event) {
     const { name, value } = event.target
 
@@ -41,8 +68,30 @@ function NonlinearOptimizer() {
     event.preventDefault()
 
     const solution = solveNonlinearOptimization(formData)
+
     setResult(solution)
+    setIsAnimating(false)
+    setAnimationIndex(solution.iterations.length)
   }
+
+  function handleStartAnimation() {
+    if (result.iterations.length === 0) return
+
+    setAnimationIndex(0)
+    setIsAnimating(true)
+  }
+
+  function handleResetAnimation() {
+    setIsAnimating(false)
+    setAnimationIndex(0)
+  }
+
+  const animatedIterations = result.iterations.slice(0, animationIndex)
+
+  const showBestPoint =
+    !result.error &&
+    result.bestRadius &&
+    animationIndex >= result.iterations.length
 
   return (
     <section className="optimizer-page">
@@ -166,50 +215,52 @@ function NonlinearOptimizer() {
       </div>
 
       <section className="explanation-section">
-  <div className="section-header compact-header">
-    <span className="section-tag">Explicação matemática</span>
-    <h2>Como funciona a otimização não linear?</h2>
-    <p>
-      Este módulo usa uma função não linear e um método iterativo para aproximar
-      o menor valor da área da embalagem.
-    </p>
-  </div>
+        <div className="section-header compact-header">
+          <span className="section-tag">Explicação matemática</span>
+          <h2>Como funciona a otimização não linear?</h2>
+          <p>
+            Este módulo usa uma função não linear e um método iterativo para
+            aproximar o menor valor da área da embalagem.
+          </p>
+        </div>
 
-  <div className="explanation-grid">
-    <ExplanationCard title="Volume fixo" tag="Condição">
-      <p>
-        O volume representa uma condição do problema. A embalagem precisa manter
-        esse volume, mesmo que o raio e a altura sejam ajustados.
-      </p>
-      <div className="mini-equation">V = πr²h</div>
-    </ExplanationCard>
+        <div className="explanation-grid">
+          <ExplanationCard title="Volume fixo" tag="Condição">
+            <p>
+              O volume representa uma condição do problema. A embalagem precisa
+              manter esse volume, mesmo que o raio e a altura sejam ajustados.
+            </p>
+            <div className="mini-equation">V = πr²h</div>
+          </ExplanationCard>
 
-    <ExplanationCard title="Área total" tag="Função">
-      <p>
-        A área total representa a quantidade de material usado na embalagem.
-        Como queremos gastar menos material, essa é a função que será
-        minimizada.
-      </p>
-      <div className="mini-equation">A(r) = 2πr² + 2V/r</div>
-    </ExplanationCard>
+          <ExplanationCard title="Área total" tag="Função">
+            <p>
+              A área total representa a quantidade de material usado na
+              embalagem. Como queremos gastar menos material, essa é a função que
+              será minimizada.
+            </p>
+            <div className="mini-equation">A(r) = 2πr² + 2V/r</div>
+          </ExplanationCard>
 
-    <ExplanationCard title="Derivada" tag="Direção">
-      <p>
-        A derivada indica se a área está aumentando ou diminuindo em determinado
-        valor de raio. Ela orienta o próximo passo do método numérico.
-      </p>
-      <div className="mini-equation">A&apos;(r) = 4πr - 2V/r²</div>
-    </ExplanationCard>
+          <ExplanationCard title="Derivada" tag="Direção">
+            <p>
+              A derivada indica se a área está aumentando ou diminuindo em
+              determinado valor de raio. Ela orienta o próximo passo do método
+              numérico.
+            </p>
+            <div className="mini-equation">A&apos;(r) = 4πr - 2V/r²</div>
+          </ExplanationCard>
 
-    <ExplanationCard title="Gradiente descendente" tag="Iteração">
-      <p>
-        O gradiente descendente ajusta o raio aos poucos. A cada iteração, o
-        sistema usa a derivada para tentar se aproximar do menor valor da área.
-      </p>
-      <div className="mini-equation">r(k+1) = r(k) - αA&apos;(r(k))</div>
-    </ExplanationCard>
-  </div>
-</section>
+          <ExplanationCard title="Gradiente descendente" tag="Iteração">
+            <p>
+              O gradiente descendente ajusta o raio aos poucos. A cada iteração,
+              o sistema usa a derivada para tentar se aproximar do menor valor
+              da área.
+            </p>
+            <div className="mini-equation">r(k+1) = r(k) - αA&apos;(r(k))</div>
+          </ExplanationCard>
+        </div>
+      </section>
 
       {result.error && (
         <div className="error-box">
@@ -241,14 +292,35 @@ function NonlinearOptimizer() {
         </div>
       )}
 
-{result.iterations.length > 0 && (
-  <NonlinearChart
-    volume={formData.volume}
-    iterations={result.iterations}
-    bestRadius={result.bestRadius}
-    minArea={result.minArea}
-  />
-)}
+      {result.iterations.length > 0 && (
+        <div className="animation-controls">
+          <button
+            type="button"
+            className="secondary-action"
+            onClick={handleStartAnimation}
+            disabled={isAnimating}
+          >
+            {isAnimating ? 'Animando...' : 'Animar gradiente descendente'}
+          </button>
+
+          <button
+            type="button"
+            className="secondary-action outline"
+            onClick={handleResetAnimation}
+          >
+            Reiniciar animação
+          </button>
+        </div>
+      )}
+
+      {result.iterations.length > 0 && (
+        <NonlinearChart
+          volume={formData.volume}
+          iterations={animatedIterations}
+          bestRadius={showBestPoint ? result.bestRadius : null}
+          minArea={showBestPoint ? result.minArea : null}
+        />
+      )}
 
       <div className="optimizer-card">
         <h3>Tabela de iterações</h3>
